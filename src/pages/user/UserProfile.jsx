@@ -19,8 +19,8 @@ const UserProfile = ({ user, setUser }) => {
   const loadUserTrips = async () => {
     try {
       setLoading(true)
-      const response = await roadtripsAPI.getTrips()
-      const allTrips = response.data.results || response.data
+      const data = await roadtripsAPI.getTrips()
+      const allTrips = data.results || data
       
       // Filter trips organized by user and trips user has joined
       const organizedTrips = allTrips.filter(trip => trip.organizer?.id === user.id)

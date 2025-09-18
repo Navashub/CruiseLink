@@ -21,8 +21,8 @@ const AdminPanel = ({ user }) => {
   const loadAdminData = async () => {
     try {
       setLoading(true)
-      const response = await roadtripsAPI.getTrips()
-      const allTrips = response.data.results || response.data
+      const data = await roadtripsAPI.getTrips()
+      const allTrips = data.results || data
       
       setTrips(allTrips)
       

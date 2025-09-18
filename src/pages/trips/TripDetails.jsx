@@ -18,12 +18,12 @@ const TripDetails = () => {
   const loadTripDetails = async () => {
     try {
       setLoading(true)
-      const [tripResponse, participantsResponse] = await Promise.all([
+      const [tripData, participantsData] = await Promise.all([
         roadtripsAPI.getTrip(id),
         roadtripsAPI.getTripParticipants(id)
       ])
-      setTrip(tripResponse.data)
-      setParticipants(participantsResponse.data.results || participantsResponse.data)
+      setTrip(tripData)
+      setParticipants(participantsData.results || participantsData)
     } catch (err) {
       setError('Failed to load trip details')
       console.error('Error loading trip details:', err)

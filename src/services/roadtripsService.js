@@ -28,6 +28,11 @@ export const roadtripsAPI = {
     return data
   },
 
+  // Alias for getTripDetails for compatibility
+  getTrip: async (tripId) => {
+    return roadtripsAPI.getTripDetails(tripId)
+  },
+
   updateTrip: async (tripId, tripData) => {
     const data = await apiClient.put(`/roadtrips/api/trips/${tripId}/`, tripData)
     return data

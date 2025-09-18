@@ -14,8 +14,8 @@ const Notifications = () => {
   const loadNotifications = async () => {
     try {
       setLoading(true)
-      const response = await roadtripsAPI.getNotifications()
-      setNotifications(response.data.results || response.data)
+      const data = await roadtripsAPI.getNotifications()
+      setNotifications(data.results || data)
     } catch (err) {
       setError('Failed to load notifications')
       console.error('Error loading notifications:', err)
