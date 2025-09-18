@@ -6,6 +6,48 @@ from .models import CustomUser
 from cars.models import CarBrand, CarModel, CarVariant, CarType, Car, CarPhoto
 
 
+class PhotoListField(serializers.Field):
+    """Custom field to handle list of uploaded photos"""
+    
+    def to_internal_value(self, data):
+        """Convert uploaded files to internal representation"""
+        from django.core.files.uploadedfile import UploadedFile
+        
+        if not data:
+            raise serializers.ValidationError("At least 2 photos are required.")
+        
+        if not isinstance(data, list):
+            data = [data]
+        
+        if len(data) < 2:
+            raise serializers.ValidationError("At least 2 photos are required.")
+        
+        if len(data) > 5:
+            raise serializers.ValidationError("Maximum 5 photos allowed.")
+        
+        validated_photos = []
+        for i, photo in enumerate(data):
+            # Check if it's a valid uploaded file
+            if not isinstance(photo, UploadedFile):
+                raise serializers.ValidationError(f"Photo {i + 1} is not a valid file.")
+            
+            # Check file size (10MB limit)
+            if photo.size > 10 * 1024 * 1024:
+                raise serializers.ValidationError(f"Photo {i + 1} is too large. Maximum size is 10MB.")
+            
+            # Check if it's an image
+            if not photo.content_type.startswith('image/'):
+                raise serializers.ValidationError(f"Photo {i + 1} must be an image file.")
+            
+            validated_photos.append(photo)
+        
+        return validated_photos
+    
+    def to_representation(self, value):
+        """Convert internal value to representation (not needed for write-only field)"""
+        return None
+
+
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True)
@@ -16,15 +58,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     car_variant = serializers.PrimaryKeyRelatedField(queryset=CarVariant.objects.all(), write_only=True)
     car_type = serializers.PrimaryKeyRelatedField(queryset=CarType.objects.all(), write_only=True)
     
-    # Photos field
-    photos = serializers.ListField(
-        child=serializers.ImageField(),
-        write_only=True,
-        required=True,
-        min_length=2,
-        max_length=5
-    )
-
+    # Photos field - use custom field to handle file validation properly
+    photos = PhotoListField(write_only=True, required=True)
+    
     class Meta:
         model = CustomUser
         fields = [
@@ -48,19 +84,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def validate_phone(self, value):
         if CustomUser.objects.filter(phone=value).exists():
             raise serializers.ValidationError("A user with this phone number already exists.")
-        return value
-
-    def validate_photos(self, value):
-        if len(value) < 2:
-            raise serializers.ValidationError("Please upload at least 2 photos of your car.")
-        if len(value) > 5:
-            raise serializers.ValidationError("You can upload maximum 5 photos.")
-        
-        # Validate file size (10MB max per file)
-        for photo in value:
-            if photo.size > 10 * 1024 * 1024:  # 10MB
-                raise serializers.ValidationError(f"Photo {photo.name} is too large. Maximum size is 10MB.")
-        
         return value
 
     def validate_car_model(self, value):
@@ -104,7 +127,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             car_type=car_type
         )
         
-        # Create car photos
+        # Create car photos (only if photos were provided)
         for photo in photos_data:
             CarPhoto.objects.create(car=car, photo=photo)
         
@@ -137,8 +160,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = CustomUser
-        fields = ['id', 'email', 'name', 'phone', 'tier', 'subscription_start', 'subscription_end', 'date_joined', 'cars']
-        read_only_fields = ['id', 'email', 'date_joined']
+        fields = ['id', 'email', 'name', 'phone', 'tier', 'subscription_start', 'subscription_end', 'cars']
+        read_only_fields = ['id', 'email']
 
     def get_cars(self, obj):
         from cars.serializers import CarSerializer

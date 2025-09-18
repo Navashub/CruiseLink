@@ -29,7 +29,14 @@ def register_user(request):
         data['photos'] = photos
     
     serializer = UserRegistrationSerializer(data=data)
-    if serializer.is_valid():
+    
+    # Temporary debug logging to see what's failing
+    if not serializer.is_valid():
+        print("DEBUG: Serializer validation failed")
+        print("DEBUG: Serializer errors:", serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
         user = serializer.save()
         token, created = Token.objects.get_or_create(user=user)
         
@@ -46,7 +53,14 @@ def register_user(request):
             'car': car_data,
             'token': token.key
         }, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("DEBUG: Error during user creation:", str(e))
+        import traceback
+        print("DEBUG: Full traceback:", traceback.format_exc())
+        return Response({
+            'error': 'An error occurred during registration',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
