@@ -1,5 +1,5 @@
 from django.db import models
-from .models import CustomUser
+from accounts.models import CustomUser
 
 # Models 
 class CarBrand(models.Model):
