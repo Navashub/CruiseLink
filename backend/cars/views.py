@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from .models import CarBrand, CarModel, CarVariant, CarType, Car
+from .models import CarBrand, CarModel, CarVariant, CarType, Car, CarPhoto
 from .serializers import (
     CarBrandSerializer, 
     CarBrandWithModelsSerializer,
@@ -10,7 +10,9 @@ from .serializers import (
     CarVariantSerializer,
     CarTypeSerializer,
     CarSerializer,
-    CarCreateSerializer
+    CarCreateSerializer,
+    CarUpdateSerializer,
+    CarPhotoSerializer
 )
 
 
@@ -94,9 +96,17 @@ def get_user_cars(request):
 @permission_classes([permissions.IsAuthenticated])
 def register_car(request):
     """
-    Register a new car for the current user
+    Register a new car for the current user with photos
     """
-    serializer = CarCreateSerializer(data=request.data, context={'request': request})
+    # Handle multipart form data for file uploads
+    data = request.data.copy()
+    
+    # Extract photos from request.FILES
+    photos = request.FILES.getlist('photos')
+    if photos:
+        data['photos'] = photos
+    
+    serializer = CarCreateSerializer(data=data, context={'request': request})
     if serializer.is_valid():
         car = serializer.save()
         response_serializer = CarSerializer(car)
@@ -127,13 +137,22 @@ def get_car_detail(request, car_id):
 @permission_classes([permissions.IsAuthenticated])
 def update_car(request, car_id):
     """
-    Update a car registration
+    Update a car registration with optional photo updates
     """
     try:
         car = Car.objects.get(id=car_id, user=request.user)
-        serializer = CarCreateSerializer(
+        
+        # Handle multipart form data for file uploads
+        data = request.data.copy()
+        
+        # Extract photos from request.FILES if present
+        photos = request.FILES.getlist('photos')
+        if photos:
+            data['photos'] = photos
+        
+        serializer = CarUpdateSerializer(
             car, 
-            data=request.data, 
+            data=data, 
             partial=request.method == 'PATCH',
             context={'request': request}
         )
@@ -163,3 +182,71 @@ def delete_car(request, car_id):
         }, status=status.HTTP_200_OK)
     except Car.DoesNotExist:
         return Response({'error': 'Car not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def add_car_photos(request, car_id):
+    """
+    Add additional photos to an existing car
+    """
+    try:
+        car = Car.objects.get(id=car_id, user=request.user)
+        photos = request.FILES.getlist('photos')
+        
+        if not photos:
+            return Response({'error': 'No photos provided'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        current_photo_count = car.photos.count()
+        if current_photo_count + len(photos) > 5:
+            return Response({
+                'error': f'Cannot add {len(photos)} photos. Maximum 5 photos allowed. Currently have {current_photo_count} photos.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate file size (10MB max per file)
+        for photo in photos:
+            if photo.size > 10 * 1024 * 1024:  # 10MB
+                return Response({
+                    'error': f'Photo {photo.name} is too large. Maximum size is 10MB.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create car photos
+        created_photos = []
+        for photo in photos:
+            car_photo = CarPhoto.objects.create(car=car, photo=photo)
+            created_photos.append(CarPhotoSerializer(car_photo).data)
+        
+        return Response({
+            'message': f'{len(created_photos)} photos added successfully',
+            'photos': created_photos
+        }, status=status.HTTP_201_CREATED)
+        
+    except Car.DoesNotExist:
+        return Response({'error': 'Car not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def delete_car_photo(request, car_id, photo_id):
+    """
+    Delete a specific car photo
+    """
+    try:
+        car = Car.objects.get(id=car_id, user=request.user)
+        photo = car.photos.get(id=photo_id)
+        
+        # Check minimum photo requirement
+        if car.photos.count() <= 2:
+            return Response({
+                'error': 'Cannot delete photo. Minimum 2 photos required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        photo.delete()
+        return Response({
+            'message': 'Photo deleted successfully'
+        }, status=status.HTTP_200_OK)
+        
+    except Car.DoesNotExist:
+        return Response({'error': 'Car not found'}, status=status.HTTP_404_NOT_FOUND)
+    except CarPhoto.DoesNotExist:
+        return Response({'error': 'Photo not found'}, status=status.HTTP_404_NOT_FOUND)

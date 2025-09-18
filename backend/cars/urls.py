@@ -17,4 +17,8 @@ urlpatterns = [
     path('<int:car_id>/', views.get_car_detail, name='car_detail'),
     path('<int:car_id>/update/', views.update_car, name='update_car'),
     path('<int:car_id>/delete/', views.delete_car, name='delete_car'),
+    
+    # Photo management endpoints
+    path('<int:car_id>/photos/add/', views.add_car_photos, name='add_car_photos'),
+    path('<int:car_id>/photos/<int:photo_id>/delete/', views.delete_car_photo, name='delete_car_photo'),
 ]

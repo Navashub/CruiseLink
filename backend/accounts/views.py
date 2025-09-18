@@ -18,15 +18,32 @@ from .models import CustomUser
 @permission_classes([permissions.AllowAny])
 def register_user(request):
     """
-    Register a new user
+    Register a new user with car information and photos
     """
-    serializer = UserRegistrationSerializer(data=request.data)
+    # Handle multipart form data for file uploads
+    data = request.data.copy()
+    
+    # Extract photos from request.FILES
+    photos = request.FILES.getlist('photos')
+    if photos:
+        data['photos'] = photos
+    
+    serializer = UserRegistrationSerializer(data=data)
     if serializer.is_valid():
         user = serializer.save()
         token, created = Token.objects.get_or_create(user=user)
+        
+        # Get the user's car information for response
+        user_car = user.cars.first()  # Get the car we just created
+        car_data = None
+        if user_car:
+            from cars.serializers import CarSerializer
+            car_data = CarSerializer(user_car).data
+        
         return Response({
             'message': 'User registered successfully',
             'user': UserProfileSerializer(user).data,
+            'car': car_data,
             'token': token.key
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

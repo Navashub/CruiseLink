@@ -72,10 +72,80 @@ class CarSerializer(serializers.ModelSerializer):
 
 
 class CarCreateSerializer(serializers.ModelSerializer):
+    photos = serializers.ListField(
+        child=serializers.ImageField(),
+        write_only=True,
+        required=True,
+        min_length=2,
+        max_length=5
+    )
+    
     class Meta:
         model = Car
-        fields = ['brand', 'model', 'variant', 'car_type']
+        fields = ['brand', 'model', 'variant', 'car_type', 'photos']
+
+    def validate_photos(self, value):
+        if len(value) < 2:
+            raise serializers.ValidationError("Please upload at least 2 photos of your car.")
+        if len(value) > 5:
+            raise serializers.ValidationError("You can upload maximum 5 photos.")
+        
+        # Validate file size (10MB max per file)
+        for photo in value:
+            if photo.size > 10 * 1024 * 1024:  # 10MB
+                raise serializers.ValidationError(f"Photo {photo.name} is too large. Maximum size is 10MB.")
+        
+        return value
 
     def create(self, validated_data):
+        photos_data = validated_data.pop('photos')
         validated_data['user'] = self.context['request'].user
-        return super().create(validated_data)
+        car = super().create(validated_data)
+        
+        # Create car photos
+        for photo in photos_data:
+            CarPhoto.objects.create(car=car, photo=photo)
+        
+        return car
+
+
+class CarUpdateSerializer(serializers.ModelSerializer):
+    photos = serializers.ListField(
+        child=serializers.ImageField(),
+        write_only=True,
+        required=False,
+        min_length=2,
+        max_length=5
+    )
+    
+    class Meta:
+        model = Car
+        fields = ['brand', 'model', 'variant', 'car_type', 'photos']
+
+    def validate_photos(self, value):
+        if value and len(value) < 2:
+            raise serializers.ValidationError("Please upload at least 2 photos of your car.")
+        if value and len(value) > 5:
+            raise serializers.ValidationError("You can upload maximum 5 photos.")
+        
+        # Validate file size (10MB max per file)
+        if value:
+            for photo in value:
+                if photo.size > 10 * 1024 * 1024:  # 10MB
+                    raise serializers.ValidationError(f"Photo {photo.name} is too large. Maximum size is 10MB.")
+        
+        return value
+
+    def update(self, instance, validated_data):
+        photos_data = validated_data.pop('photos', None)
+        instance = super().update(instance, validated_data)
+        
+        # Update car photos if provided
+        if photos_data is not None:
+            # Delete existing photos
+            instance.photos.all().delete()
+            # Create new photos
+            for photo in photos_data:
+                CarPhoto.objects.create(car=instance, photo=photo)
+        
+        return instance
