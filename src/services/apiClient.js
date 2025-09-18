@@ -33,11 +33,20 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || data.error || 'Request failed');
+        // Create a more detailed error object for better handling
+        const error = new Error(data.message || data.error || 'Request failed');
+        error.status = response.status;
+        error.details = data;
+        throw error;
       }
 
       return data;
     } catch (error) {
+      // If it's already our custom error, rethrow it
+      if (error.status) {
+        throw error;
+      }
+      // Otherwise create a network error
       throw new Error(error.message || 'Network error');
     }
   }

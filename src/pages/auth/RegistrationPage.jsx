@@ -1,23 +1,93 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { carDatabase, carTypes, getAllBrands, getModelsForBrand, getVariantsForModel } from '../../data/carDatabase'
-import { validateUserData } from '../../utils/userUtils'
+import { authAPI, carsAPI } from '../../services'
 
 const RegistrationPage = ({ onRegister }) => {
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState({
     name: '',
+    email: '',
     phone: '',
-    carBrand: '',
-    carModel: '',
-    carVariant: '',
-    carType: '',
+    password: '',
+    password_confirm: '',
+    car_brand: '',
+    car_model: '',
+    car_variant: '',
+    car_type: '',
     photos: [],
     tier: 'free'
   })
+  const [carData, setCarData] = useState({
+    brands: [],
+    models: [],
+    variants: [],
+    types: []
+  })
   const [errors, setErrors] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  // Load car data on component mount
+  useEffect(() => {
+    const loadCarData = async () => {
+      try {
+        const [brands, types] = await Promise.all([
+          carsAPI.getBrands(),
+          carsAPI.getCarTypes()
+        ])
+        setCarData(prev => ({
+          ...prev,
+          brands: brands,
+          types: types
+        }))
+      } catch (error) {
+        console.error('Failed to load car data:', error)
+        setErrors(['Failed to load car data. Please refresh the page.'])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadCarData()
+  }, [])
+
+  // Load models when brand changes
+  useEffect(() => {
+    if (formData.car_brand) {
+      const loadModels = async () => {
+        try {
+          const models = await carsAPI.getModels(formData.car_brand)
+          setCarData(prev => ({
+            ...prev,
+            models: models,
+            variants: []
+          }))
+        } catch (error) {
+          console.error('Failed to load models:', error)
+        }
+      }
+      loadModels()
+    }
+  }, [formData.car_brand])
+
+  // Load variants when model changes
+  useEffect(() => {
+    if (formData.car_model) {
+      const loadVariants = async () => {
+        try {
+          const variants = await carsAPI.getVariants(formData.car_model)
+          setCarData(prev => ({
+            ...prev,
+            variants: variants
+          }))
+        } catch (error) {
+          console.error('Failed to load variants:', error)
+        }
+      }
+      loadVariants()
+    }
+  }, [formData.car_model])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -25,8 +95,8 @@ const RegistrationPage = ({ onRegister }) => {
       ...prev,
       [name]: value,
       // Reset dependent fields when parent changes
-      ...(name === 'carBrand' && { carModel: '', carVariant: '' }),
-      ...(name === 'carModel' && { carVariant: '' })
+      ...(name === 'car_brand' && { car_model: '', car_variant: '' }),
+      ...(name === 'car_model' && { car_variant: '' })
     }))
     
     // Clear errors when user starts typing
@@ -37,18 +107,24 @@ const RegistrationPage = ({ onRegister }) => {
 
   const handlePhotoUpload = (e) => {
     const files = Array.from(e.target.files)
+    console.log('Debug: New files uploaded:', files.map(f => f.name))
     if (files.length + formData.photos.length > 5) {
       setErrors(['You can upload maximum 5 photos'])
       return
     }
     
-    // Simulate file upload (in real app, would upload to cloud storage)
-    const newPhotos = files.map(file => ({
-      id: Date.now() + Math.random(),
-      name: file.name,
-      url: URL.createObjectURL(file),
-      file
-    }))
+    // Store actual files for API submission
+    const newPhotos = files.map(file => {
+      console.log('Debug: Processing file:', file.name, file.constructor.name, file instanceof File)
+      return {
+        id: Date.now() + Math.random(),
+        name: file.name,
+        url: URL.createObjectURL(file),
+        file
+      }
+    })
+    
+    console.log('Debug: New photos array:', newPhotos)
     
     setFormData(prev => ({
       ...prev,
@@ -64,22 +140,37 @@ const RegistrationPage = ({ onRegister }) => {
     }))
   }
 
+  // Validation functions
   const validateStep = (step) => {
     switch (step) {
       case 1:
-        if (!formData.name.trim()) return ['Name is required']
-        if (!formData.phone.trim()) return ['Phone number is required']
-        return []
-      case 2:
         const errors = []
-        if (!formData.carBrand) errors.push('Car brand is required')
-        if (!formData.carModel) errors.push('Car model is required')
-        if (!formData.carVariant) errors.push('Car variant is required')
-        if (!formData.carType) errors.push('Car type is required')
+        if (!formData.name.trim()) errors.push('Name is required')
+        if (!formData.email.trim()) errors.push('Email is required')
+        if (!formData.phone.trim()) errors.push('Phone number is required')
+        if (!formData.password.trim()) errors.push('Password is required')
+        if (!formData.password_confirm.trim()) errors.push('Password confirmation is required')
+        if (formData.password !== formData.password_confirm) errors.push('Passwords do not match')
         return errors
+      case 2:
+        const step2errors = []
+        if (!formData.car_brand) step2errors.push('Car brand is required')
+        if (!formData.car_model) step2errors.push('Car model is required')
+        if (!formData.car_variant) step2errors.push('Car variant is required')
+        if (!formData.car_type) step2errors.push('Car type is required')
+        return step2errors
       case 3:
         if (formData.photos.length < 2) return ['Please upload at least 2 photos of your car']
+        if (formData.photos.length > 5) return ['Maximum 5 photos allowed']
         return []
+      case 4:
+        // Final validation - check all steps
+        const allErrors = [
+          ...validateStep(1),
+          ...validateStep(2), 
+          ...validateStep(3)
+        ]
+        return allErrors
       default:
         return []
     }
@@ -104,51 +195,96 @@ const RegistrationPage = ({ onRegister }) => {
     e.preventDefault()
     setIsSubmitting(true)
     
-    // Validate all data
-    const validationErrors = validateUserData(formData)
-    if (validationErrors.length > 0) {
-      setErrors(validationErrors)
+    // Final validation
+    const stepErrors = validateStep(4)
+    if (stepErrors.length > 0) {
+      setErrors(stepErrors)
       setIsSubmitting(false)
       return
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // Create user object
-      const newUser = {
-        id: Date.now().toString(),
+      // Prepare data for API
+      const userData = {
         name: formData.name,
+        email: formData.email,
         phone: formData.phone,
-        carBrand: formData.carBrand,
-        carModel: formData.carModel,
-        carVariant: formData.carVariant,
-        carType: formData.carType,
-        photos: formData.photos.map(p => p.url),
-        tier: formData.tier,
-        stats: {
-          tripsCreated: 0,
-          tripsJoined: 0,
-          points: 25, // Verification bonus
-          monthlyTrips: 0,
-          notificationsReceived: 0
-        },
-        createdAt: new Date().toISOString()
+        password: formData.password,
+        password_confirm: formData.password_confirm,
+        car_brand: formData.car_brand,
+        car_model: formData.car_model,
+        car_variant: formData.car_variant,
+        car_type: formData.car_type,
+        tier: formData.tier
       }
       
-      onRegister(newUser)
+      // Extract actual files for upload - ensure all are valid File objects
+      const photoFiles = formData.photos
+        .map(photo => photo.file)
+        .filter(file => file instanceof File && file.size > 0 && file.type.startsWith('image/'))
+      
+      // Final validation check before API call
+      if (photoFiles.length < 2) {
+        setErrors(['Please upload at least 2 photos of your car'])
+        setIsSubmitting(false)
+        return
+      }
+      
+      // Call registration API
+      const response = await authAPI.register(userData, photoFiles)
+      
+      // Handle successful registration
+      onRegister(response.user, response.token)
       navigate('/')
     } catch (error) {
-      setErrors(['Registration failed. Please try again.'])
+      console.error('Registration error:', error)
+      
+      // Handle different types of errors
+      let errorMessages = []
+      
+      if (error.status === 400 && error.details) {
+        // Extract validation errors from Django REST framework response
+        Object.keys(error.details).forEach(field => {
+          const fieldErrors = Array.isArray(error.details[field]) 
+            ? error.details[field] 
+            : [error.details[field]]
+          fieldErrors.forEach(msg => {
+            // Better formatting for field errors
+            const fieldName = field === 'car_brand' ? 'Car Brand' :
+                            field === 'car_model' ? 'Car Model' :
+                            field === 'car_variant' ? 'Car Variant' :
+                            field === 'car_type' ? 'Car Type' :
+                            field === 'password_confirm' ? 'Password Confirmation' :
+                            field.charAt(0).toUpperCase() + field.slice(1)
+            
+            // Convert object errors to string
+            const errorMsg = typeof msg === 'object' ? JSON.stringify(msg) : msg
+            errorMessages.push(`${fieldName}: ${errorMsg}`)
+          })
+        })
+      }
+      
+      // Fall back to general error message if no specific errors found
+      if (errorMessages.length === 0) {
+        errorMessages = [error.message || 'Registration failed. Please try again.']
+      }
+      
+      setErrors(errorMessages)
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const availableBrands = getAllBrands()
-  const availableModels = getModelsForBrand(formData.carBrand)
-  const availableVariants = getVariantsForModel(formData.carBrand, formData.carModel)
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading registration form...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -213,6 +349,20 @@ const RegistrationPage = ({ onRegister }) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter your email address"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number *
                 </label>
                 <input
@@ -222,6 +372,34 @@ const RegistrationPage = ({ onRegister }) => {
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="+1234567890"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Create a secure password"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirm Password *
+                </label>
+                <input
+                  type="password"
+                  name="password_confirm"
+                  value={formData.password_confirm}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Confirm your password"
                 />
               </div>
             </div>
@@ -242,14 +420,14 @@ const RegistrationPage = ({ onRegister }) => {
                     Car Brand *
                   </label>
                   <select
-                    name="carBrand"
-                    value={formData.carBrand}
+                    name="car_brand"
+                    value={formData.car_brand}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Select Brand</option>
-                    {availableBrands.map(brand => (
-                      <option key={brand} value={brand}>{brand}</option>
+                    {carData.brands.map(brand => (
+                      <option key={brand.id} value={brand.id}>{brand.name}</option>
                     ))}
                   </select>
                 </div>
@@ -259,15 +437,15 @@ const RegistrationPage = ({ onRegister }) => {
                     Car Model *
                   </label>
                   <select
-                    name="carModel"
-                    value={formData.carModel}
+                    name="car_model"
+                    value={formData.car_model}
                     onChange={handleInputChange}
-                    disabled={!formData.carBrand}
+                    disabled={!formData.car_brand}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                   >
                     <option value="">Select Model</option>
-                    {availableModels.map(model => (
-                      <option key={model} value={model}>{model}</option>
+                    {carData.models.map(model => (
+                      <option key={model.id} value={model.id}>{model.name}</option>
                     ))}
                   </select>
                 </div>
@@ -279,15 +457,15 @@ const RegistrationPage = ({ onRegister }) => {
                     Specific Variant *
                   </label>
                   <select
-                    name="carVariant"
-                    value={formData.carVariant}
+                    name="car_variant"
+                    value={formData.car_variant}
                     onChange={handleInputChange}
-                    disabled={!formData.carModel}
+                    disabled={!formData.car_model}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                   >
                     <option value="">Select Variant</option>
-                    {availableVariants.map(variant => (
-                      <option key={variant} value={variant}>{variant}</option>
+                    {carData.variants.map(variant => (
+                      <option key={variant.id} value={variant.id}>{variant.name}</option>
                     ))}
                   </select>
                 </div>
@@ -297,14 +475,14 @@ const RegistrationPage = ({ onRegister }) => {
                     Car Type *
                   </label>
                   <select
-                    name="carType"
-                    value={formData.carType}
+                    name="car_type"
+                    value={formData.car_type}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Select Type</option>
-                    {carTypes.map(type => (
-                      <option key={type} value={type}>{type}</option>
+                    {carData.types.map(type => (
+                      <option key={type.id} value={type.id}>{type.name}</option>
                     ))}
                   </select>
                 </div>

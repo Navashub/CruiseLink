@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FormData Test</title>
+</head>
+<body>
+    <h1>FormData Photo Upload Test</h1>
+    
+    <form id="testForm">
+        <input type="file" id="photos" multiple accept="image/*">
+        <button type="button" onclick="testFormData()">Test FormData</button>
+    </form>
+    
+    <div id="output"></div>
+    
+    <script>
+        function testFormData() {
+            const fileInput = document.getElementById('photos');
+            const files = Array.from(fileInput.files);
+            
+            console.log('Selected files:', files);
+            
+            if (files.length === 0) {
+                document.getElementById('output').innerHTML = 'Please select some files first';
+                return;
+            }
+            
+            // Create FormData like our app does
+            const formData = new FormData();
+            
+            // Add some sample user data
+            formData.append('username', 'testuser');
+            formData.append('email', 'test@example.com');
+            
+            // Add photos
+            files.forEach((file, index) => {
+                console.log(`Adding file ${index}:`, file.name, file.size, file.type);
+                formData.append('photos', file);
+            });
+            
+            // Log FormData contents
+            console.log('FormData entries:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`  ${key}:`, value instanceof File ? `File(${value.name}, ${value.size} bytes, ${value.type})` : value);
+            }
+            
+            // Test sending to our Django backend
+            fetch('http://localhost:8000/api/auth/register/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                document.getElementById('output').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('output').innerHTML = 'Error: ' + error.message;
+            });
+        }
+    </script>
+</body>
+</html>

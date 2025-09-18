@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { testCredentials, sampleUsers } from '../../data/sampleData'
+import { authAPI } from '../../services'
 
 const LoginPage = ({ onLogin }) => {
   const navigate = useNavigate()
@@ -28,39 +28,26 @@ const LoginPage = ({ onLogin }) => {
     setIsLoading(true)
     setErrors([])
 
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    // Check credentials
-    const credentials = testCredentials[formData.email.toLowerCase()]
-    
-    if (!credentials || credentials.password !== formData.password) {
-      setErrors(['Invalid email or password'])
+    // Validate input
+    if (!formData.email.trim() || !formData.password.trim()) {
+      setErrors(['Please fill in all fields'])
       setIsLoading(false)
       return
     }
 
-    // Find user data
-    const user = sampleUsers.find(u => u.id === credentials.userId)
-    
-    if (!user) {
-      setErrors(['User not found'])
+    try {
+      // Call login API
+      const response = await authAPI.login(formData.email, formData.password)
+      
+      // Handle successful login
+      onLogin(response.user, response.token)
+      navigate('/')
+    } catch (error) {
+      console.error('Login error:', error)
+      setErrors([error.message || 'Login failed. Please try again.'])
+    } finally {
       setIsLoading(false)
-      return
     }
-
-    // Add role if admin
-    const userData = credentials.role === 'admin' 
-      ? { ...user, role: 'admin' }
-      : user
-
-    onLogin(userData)
-    navigate('/')
-    setIsLoading(false)
-  }
-
-  const quickLogin = (email, password) => {
-    setFormData({ email, password })
   }
 
   return (
@@ -73,50 +60,6 @@ const LoginPage = ({ onLogin }) => {
           </Link>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back!</h2>
           <p className="text-gray-600">Sign in to your account to continue your adventures</p>
-        </div>
-
-        {/* Test Accounts Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-medium text-blue-900 mb-3">🧪 Test Accounts</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-blue-700">Free User:</span>
-              <button 
-                onClick={() => quickLogin('free@test.com', 'test123')}
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                free@test.com
-              </button>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-blue-700">Premium User:</span>
-              <button 
-                onClick={() => quickLogin('premium@test.com', 'test123')}
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                premium@test.com
-              </button>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-blue-700">Yearly User:</span>
-              <button 
-                onClick={() => quickLogin('yearly@test.com', 'test123')}
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                yearly@test.com
-              </button>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-blue-700">Admin:</span>
-              <button 
-                onClick={() => quickLogin('admin@roadtrip.com', 'admin123')}
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                admin@roadtrip.com
-              </button>
-            </div>
-            <p className="text-blue-600 text-xs mt-2">Click any email to auto-fill (password: test123 / admin123)</p>
-          </div>
         </div>
 
         {/* Login Form */}

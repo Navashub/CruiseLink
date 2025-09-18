@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Registration API</title>
+</head>
+<body>
+    <h1>Test Registration API</h1>
+    <button onclick="testRegistration()">Test Registration</button>
+    <div id="result"></div>
+
+    <script>
+        async function testRegistration() {
+            const formData = new FormData();
+            
+            // Add basic user data
+            formData.append('name', 'Test User');
+            formData.append('email', 'test@example.com');
+            formData.append('phone', '1234567890');
+            formData.append('password', 'testpass123');
+            formData.append('password_confirm', 'testpass123');
+            formData.append('car_brand', '1');
+            formData.append('car_model', '1');
+            formData.append('car_variant', '1');
+            formData.append('car_type', '1');
+            formData.append('tier', 'free');
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/auth/register/', {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                const data = await response.json();
+                const resultDiv = document.getElementById('result');
+                
+                if (!response.ok) {
+                    resultDiv.innerHTML = `<h3>Error (${response.status}):</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<h3>Success:</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<h3>Network Error:</h3><pre>${error.message}</pre>`;
+            }
+        }
+    </script>
+</body>
+</html>
