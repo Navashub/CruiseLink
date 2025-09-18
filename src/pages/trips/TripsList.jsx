@@ -26,8 +26,8 @@ const TripsList = () => {
   const loadTrips = async () => {
     try {
       setLoading(true)
-      const response = await roadtripsAPI.getTrips()
-      setTrips(response.data.results || response.data)
+      const data = await roadtripsAPI.getTrips()
+      setTrips(data.results || data)
     } catch (err) {
       setError('Failed to load trips')
       console.error('Error loading trips:', err)

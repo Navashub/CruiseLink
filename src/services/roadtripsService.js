@@ -14,72 +14,72 @@ export const roadtripsAPI = {
     })
     
     const url = `/roadtrips/api/trips/${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
-    const response = await apiClient.get(url)
-    return response.data
+    const data = await apiClient.get(url)
+    return data
   },
 
   createTrip: async (tripData) => {
-    const response = await apiClient.post('/roadtrips/api/trips/', tripData)
-    return response.data
+    const data = await apiClient.post('/roadtrips/api/trips/', tripData)
+    return data
   },
 
   getTripDetails: async (tripId) => {
-    const response = await apiClient.get(`/roadtrips/api/trips/${tripId}/`)
-    return response.data
+    const data = await apiClient.get(`/roadtrips/api/trips/${tripId}/`)
+    return data
   },
 
   updateTrip: async (tripId, tripData) => {
-    const response = await apiClient.put(`/roadtrips/api/trips/${tripId}/`, tripData)
-    return response.data
+    const data = await apiClient.put(`/roadtrips/api/trips/${tripId}/`, tripData)
+    return data
   },
 
   deleteTrip: async (tripId) => {
-    const response = await apiClient.delete(`/roadtrips/api/trips/${tripId}/`)
-    return response.data
+    const data = await apiClient.delete(`/roadtrips/api/trips/${tripId}/`)
+    return data
   },
 
   // Trip participation
   joinTrip: async (tripId, joinData = {}) => {
-    const response = await apiClient.post(`/roadtrips/api/trips/${tripId}/join/`, joinData)
-    return response.data
+    const data = await apiClient.post(`/roadtrips/api/trips/${tripId}/join/`, joinData)
+    return data
   },
 
   leaveTrip: async (tripId) => {
-    const response = await apiClient.post(`/roadtrips/api/trips/${tripId}/leave/`)
-    return response.data
+    const data = await apiClient.post(`/roadtrips/api/trips/${tripId}/leave/`)
+    return data
   },
 
   getTripParticipants: async (tripId) => {
-    const response = await apiClient.get(`/roadtrips/api/trips/${tripId}/participants/`)
-    return response.data
+    const data = await apiClient.get(`/roadtrips/api/trips/${tripId}/participants/`)
+    return data
   },
 
   updateParticipantStatus: async (tripId, participantData) => {
-    const response = await apiClient.post(`/roadtrips/api/trips/${tripId}/update_participant_status/`, participantData)
-    return response.data
+    const data = await apiClient.post(`/roadtrips/api/trips/${tripId}/update_participant_status/`, participantData)
+    return data
   },
 
   // Notifications
   getNotifications: async (params = {}) => {
     const searchParams = new URLSearchParams(params)
     const url = `/roadtrips/api/notifications/${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
-    const response = await apiClient.get(url)
-    return response.data
+    const data = await apiClient.get(url)
+    return data
   },
 
   markNotificationRead: async (notificationId) => {
-    const response = await apiClient.post(`/roadtrips/api/notifications/${notificationId}/mark_read/`)
-    return response.data
+    const data = await apiClient.post(`/roadtrips/api/notifications/${notificationId}/mark_read/`)
+    return data
   },
 
   markAllNotificationsRead: async () => {
-    const response = await apiClient.post('/roadtrips/api/notifications/mark_all_read/')
-    return response.data
+    const data = await apiClient.post('/roadtrips/api/notifications/mark_all_read/')
+    return data
   },
 
   getUnreadNotificationCount: async () => {
-    const response = await apiClient.get('/roadtrips/api/notifications/unread_count/')
-    return response.data
+    const data = await apiClient.get('/roadtrips/api/notifications/unread_count/')
+    return data
   },
 
   // Utility methods for frontend filtering

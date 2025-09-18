@@ -8,6 +8,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         ('free', 'Free'),
         ('premium', 'Premium'),
         ('enterprise', 'Enterprise'),
+        ('admin', 'Admin'),
     ]
 
     email = models.EmailField(unique=True)

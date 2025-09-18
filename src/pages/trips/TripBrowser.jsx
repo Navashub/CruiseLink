@@ -24,8 +24,8 @@ const TripBrowser = ({ user }) => {
   const loadTrips = async () => {
     try {
       setLoading(true)
-      const response = await roadtripsAPI.getTrips()
-      const tripsData = response.data.results || response.data
+      const data = await roadtripsAPI.getTrips()
+      const tripsData = data.results || data
       setTrips(tripsData)
       setFilteredTrips(tripsData)
     } catch (err) {

@@ -157,15 +157,37 @@ class UserLoginSerializer(serializers.Serializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     cars = serializers.SerializerMethodField()
+    stats = serializers.SerializerMethodField()
     
     class Meta:
         model = CustomUser
-        fields = ['id', 'email', 'name', 'phone', 'tier', 'subscription_start', 'subscription_end', 'cars']
+        fields = ['id', 'email', 'name', 'phone', 'tier', 'subscription_start', 'subscription_end', 'cars', 'stats']
         read_only_fields = ['id', 'email']
 
     def get_cars(self, obj):
         from cars.serializers import CarSerializer
         return CarSerializer(obj.cars.all(), many=True).data
+    
+    def get_stats(self, obj):
+        # Calculate user stats dynamically
+        from roadtrips.models import RoadTrip
+        from datetime import datetime, timedelta
+        from django.utils import timezone
+        
+        # Calculate current month's trip count
+        now = timezone.now()
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        monthly_trips = RoadTrip.objects.filter(
+            organizer=obj,
+            created_at__gte=start_of_month
+        ).count()
+        
+        return {
+            'monthlyTrips': monthly_trips,
+            'notificationsReceived': 0,  # TODO: Implement notification tracking
+            'points': 0,  # TODO: Implement points system
+        }
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):

@@ -7,24 +7,24 @@ export const tierInfo = {
     price: 0,
     monthlyTripLimit: 1,
     monthlyNotificationLimit: 2,
-    canCreateTrips: false,
+    canCreateTrips: true,
     features: ['Join unlimited trips', '1 trip creation per month', 'Basic support']
   },
-  premium_monthly: {
-    name: 'Premium Monthly',
+  premium: {
+    name: 'Premium',
     price: 10,
-    monthlyTripLimit: Infinity,
+    monthlyTripLimit: 10,
     monthlyNotificationLimit: Infinity,
     canCreateTrips: true,
-    features: ['Unlimited trip creation', 'Unlimited notifications', 'Priority support', 'Advanced filtering']
+    features: ['10 trip creation per month', 'Unlimited notifications', 'Priority support', 'Advanced filtering']
   },
-  premium_yearly: {
-    name: 'Premium Yearly',
-    price: 96,
-    monthlyTripLimit: Infinity,
+  enterprise: {
+    name: 'Enterprise',
+    price: 200,
+    monthlyTripLimit: 100,
     monthlyNotificationLimit: Infinity,
     canCreateTrips: true,
-    features: ['Unlimited trip creation', 'Unlimited notifications', 'Priority support', 'Advanced filtering', '20% savings']
+    features: ['100 trip creation per month', 'Unlimited notifications', 'Dedicated support', 'Custom features', 'API access']
   },
   admin: {
     name: 'Admin',
@@ -38,21 +38,28 @@ export const tierInfo = {
 
 // Check if user can create a trip
 export const canUserCreateTrip = (user) => {
-  const tier = tierInfo[user.tier]
-  if (!tier.canCreateTrips) return false
+  if (!user || !user.tier) return false
   
-  return user.stats.monthlyTrips < tier.monthlyTripLimit
+  const tier = tierInfo[user.tier]
+  if (!tier || !tier.canCreateTrips) return false
+  
+  if (!user.stats) return true // If no stats, allow creation (new user)
+  
+  return (user.stats.monthlyTrips || 0) < tier.monthlyTripLimit
 }
 
 // Check if user can receive more notifications
 export const canUserReceiveNotification = (user) => {
+  if (!user || !user.tier || !user.stats) return true // Default to true for new users
+  
   const tier = tierInfo[user.tier]
-  return user.stats.notificationsReceived < tier.monthlyNotificationLimit
+  return (user.stats.notificationsReceived || 0) < tier.monthlyNotificationLimit
 }
 
 // Get user tier display info
 export const getUserTierInfo = (user) => {
-  return tierInfo[user.tier]
+  if (!user || !user.tier) return tierInfo.free // Default to free tier
+  return tierInfo[user.tier] || tierInfo.free
 }
 
 // Calculate points for actions
@@ -66,24 +73,29 @@ export const pointsSystem = {
 
 // Add points to user
 export const addPointsToUser = (user, action) => {
+  if (!user) return user
+  
   const points = pointsSystem[action] || 0
+  const currentStats = user.stats || {}
+  const currentPoints = currentStats.points || 0
+  
   return {
     ...user,
     stats: {
-      ...user.stats,
-      points: user.stats.points + points
+      ...currentStats,
+      points: currentPoints + points
     }
   }
 }
 
 // Check if user needs tier upgrade prompt
 export const shouldShowUpgradePrompt = (user) => {
-  if (user.tier !== 'free') return false
+  if (!user || user.tier !== 'free' || !user.stats) return false
   
   // Show upgrade if user has hit monthly limits
   const tier = tierInfo[user.tier]
-  const hitTripLimit = user.stats.monthlyTrips >= tier.monthlyTripLimit
-  const hitNotificationLimit = user.stats.notificationsReceived >= tier.monthlyNotificationLimit
+  const hitTripLimit = (user.stats.monthlyTrips || 0) >= tier.monthlyTripLimit
+  const hitNotificationLimit = (user.stats.notificationsReceived || 0) >= tier.monthlyNotificationLimit
   
   return hitTripLimit || hitNotificationLimit
 }
@@ -126,4 +138,19 @@ export const validateUserData = (userData) => {
   }
   
   return errors
+}
+
+// Ensure user object has proper default stats
+export const ensureUserStats = (user) => {
+  if (!user) return null
+  
+  return {
+    ...user,
+    stats: {
+      monthlyTrips: 0,
+      notificationsReceived: 0,
+      points: 0,
+      ...user.stats
+    }
+  }
 }

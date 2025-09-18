@@ -8,20 +8,39 @@ export const useAuth = () => {
 
   // Initialize auth state from localStorage
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    const savedUser = localStorage.getItem('user');
-    
-    if (token && savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-        setIsAuthenticated(true);
-      } catch (error) {
-        console.error('Error parsing saved user:', error);
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('authToken');
+      const savedUser = localStorage.getItem('user');
+      
+      if (token) {
+        try {
+          // Try to fetch fresh user data from server
+          const profileData = await authService.getProfile();
+          setUser(profileData);
+          setIsAuthenticated(true);
+          localStorage.setItem('user', JSON.stringify(profileData));
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+          // Fallback to saved user data if server request fails
+          if (savedUser) {
+            try {
+              setUser(JSON.parse(savedUser));
+              setIsAuthenticated(true);
+            } catch (parseError) {
+              console.error('Error parsing saved user:', parseError);
+              localStorage.removeItem('authToken');
+              localStorage.removeItem('user');
+            }
+          } else {
+            // No saved user and server request failed, clear token
+            localStorage.removeItem('authToken');
+          }
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+    
+    initializeAuth();
   }, []);
 
   const login = async (credentials) => {
@@ -76,6 +95,18 @@ export const useAuth = () => {
     setUser(updatedUser);
   };
 
+  const refreshUser = async () => {
+    try {
+      const profileData = await authService.getProfile();
+      setUser(profileData);
+      localStorage.setItem('user', JSON.stringify(profileData));
+      return profileData;
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+      throw error;
+    }
+  };
+
   return {
     user,
     isAuthenticated,
@@ -84,5 +115,6 @@ export const useAuth = () => {
     register,
     logout,
     updateUser,
+    refreshUser,
   };
 };
