@@ -43,18 +43,31 @@ export const validateTripData = (tripData) => {
 
 // Check trip eligibility for a user
 export const isUserEligibleForTrip = (user, trip) => {
+  if (!user || !trip || !trip.eligibleCars) return false
+  
+  // If user has no cars, they can't be eligible
+  if (!user.cars || user.cars.length === 0) return false
+  
   const { brands, models, types } = trip.eligibleCars
   
-  // Check brand eligibility
-  const matchesBrand = brands.length === 0 || brands.includes(user.carBrand)
+  // If no eligibility criteria are set, all cars are welcome
+  if (brands.length === 0 && models.length === 0 && types.length === 0) {
+    return true
+  }
   
-  // Check model eligibility (check against user's variant)
-  const matchesModel = models.length === 0 || models.includes(user.carVariant)
-  
-  // Check type eligibility
-  const matchesType = types.length === 0 || types.includes(user.carType)
-  
-  return matchesBrand && matchesModel && matchesType
+  // Check if any of the user's cars match the criteria
+  return user.cars.some(car => {
+    // Check brand eligibility
+    const matchesBrand = brands.length === 0 || brands.includes(car.brand?.id)
+    
+    // Check model eligibility
+    const matchesModel = models.length === 0 || models.includes(car.model?.id)
+    
+    // Check type eligibility
+    const matchesType = types.length === 0 || types.includes(car.type?.id)
+    
+    return matchesBrand && matchesModel && matchesType
+  })
 }
 
 // Format trip date for display
@@ -72,7 +85,12 @@ export const formatTripDate = (dateString) => {
 
 // Get trip status color
 export const getTripStatusColor = (trip) => {
-  const spotsLeft = trip.maxCapacity - trip.participants.length
+  if (!trip || typeof trip.maxCapacity !== 'number') {
+    return 'gray'
+  }
+  
+  const participantsCount = trip.participants?.length || 0
+  const spotsLeft = trip.maxCapacity - participantsCount
   
   if (spotsLeft === 0) return 'red'
   if (spotsLeft <= 5) return 'yellow'
@@ -81,7 +99,12 @@ export const getTripStatusColor = (trip) => {
 
 // Get spots remaining text
 export const getSpotsRemainingText = (trip) => {
-  const spotsLeft = trip.maxCapacity - trip.participants.length
+  if (!trip || typeof trip.maxCapacity !== 'number') {
+    return 'Capacity unknown'
+  }
+  
+  const participantsCount = trip.participants?.length || 0
+  const spotsLeft = trip.maxCapacity - participantsCount
   
   if (spotsLeft === 0) return 'Trip Full'
   if (spotsLeft === 1) return '1 spot remaining'
@@ -90,7 +113,12 @@ export const getSpotsRemainingText = (trip) => {
 
 // Format eligible cars for display
 export const formatEligibleCars = (eligibleCars) => {
-  const { brands, models, types } = eligibleCars
+  // Handle undefined or null eligibleCars
+  if (!eligibleCars) {
+    return 'All cars welcome'
+  }
+  
+  const { brands = [], models = [], types = [] } = eligibleCars
   const criteria = []
   
   if (brands.length > 0) {

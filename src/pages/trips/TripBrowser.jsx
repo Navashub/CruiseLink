@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { roadtripsAPI } from '../../services'
-import { formatTripDate, getSpotsRemainingText, formatEligibleCars, getDaysUntilTrip } from '../../utils/tripUtils'
+import { formatTripDate, getSpotsRemainingText, formatEligibleCars, getDaysUntilTrip, isUserEligibleForTrip } from '../../utils/tripUtils'
 
 const TripBrowser = ({ user }) => {
   const navigate = useNavigate()
@@ -121,6 +121,9 @@ const TripBrowser = ({ user }) => {
     const isParticipant = trip.participants?.some(p => p.user?.id === currentUser.id) || false
     const canJoin = trip.status === 'open' && !isParticipant && trip.currentParticipants < trip.maxParticipants
     const spotsLeft = trip.maxParticipants - (trip.currentParticipants || 0)
+    const daysUntil = getDaysUntilTrip(trip.departureDate)
+    const hasJoined = isParticipant
+    const isEligible = isUserEligibleForTrip(currentUser, trip)
     return (
       <div className="bg-white rounded-xl shadow-lg hover-lift overflow-hidden">
         {/* Trip Header */}
@@ -148,7 +151,7 @@ const TripBrowser = ({ user }) => {
             </span>
             <span className="flex items-center">
               <span className="mr-2">👤</span>
-              {trip.organizer}
+              {trip.organizer?.name || trip.organizer || 'Unknown'}
             </span>
           </div>
         </div>
@@ -188,7 +191,7 @@ const TripBrowser = ({ user }) => {
               </Link>
               <span className="text-gray-300">•</span>
               <span className="text-sm text-gray-500">
-                {trip.participants.length}/{trip.maxCapacity} joined
+                {trip.participants?.length || 0}/{trip.maxCapacity} joined
               </span>
             </div>
 
@@ -306,13 +309,18 @@ const TripBrowser = ({ user }) => {
               </div>
               <div>
                 <div className="text-2xl font-bold text-green-600">
-                  {trips.filter(t => isUserEligibleForTrip(user, t)).length}
+                  {user ? trips.filter(t => isUserEligibleForTrip(user, t)).length : 0}
                 </div>
                 <div className="text-sm text-gray-500">Eligible</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-yellow-600">
-                  {trips.filter(t => t.participants.includes(user.id)).length}
+                  {user ? trips.filter(t => 
+                    t.participants && (
+                      t.participants.includes(user.id) || 
+                      t.participants.some(p => p.user?.id === user.id || p.id === user.id)
+                    )
+                  ).length : 0}
                 </div>
                 <div className="text-sm text-gray-500">Joined</div>
               </div>
