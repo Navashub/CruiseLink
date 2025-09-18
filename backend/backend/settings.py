@@ -28,9 +28,9 @@ INSTALLED_APPS = [
     'corsheaders',
 
     # installed apps 
-    'trips',
     'accounts',
     'cars',
+    'roadtrips',
 ]
 
 MIDDLEWARE = [
