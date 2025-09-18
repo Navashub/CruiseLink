@@ -8,7 +8,7 @@ export const useAuth = () => {
 
   // Initialize auth state from localStorage
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('user');
     
     if (token && savedUser) {
@@ -17,7 +17,7 @@ export const useAuth = () => {
         setIsAuthenticated(true);
       } catch (error) {
         console.error('Error parsing saved user:', error);
-        localStorage.removeItem('token');
+        localStorage.removeItem('authToken');
         localStorage.removeItem('user');
       }
     }
@@ -29,7 +29,7 @@ export const useAuth = () => {
       const response = await authService.login(credentials);
       const { user, token } = response;
       
-      localStorage.setItem('token', token);
+      localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(user));
       
       setUser(user);
@@ -46,7 +46,7 @@ export const useAuth = () => {
       const response = await authService.register(registrationData);
       const { user, token } = response;
       
-      localStorage.setItem('token', token);
+      localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(user));
       
       setUser(user);
@@ -64,7 +64,7 @@ export const useAuth = () => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      localStorage.removeItem('token');
+      localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       setUser(null);
       setIsAuthenticated(false);

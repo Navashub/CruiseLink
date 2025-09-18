@@ -1,15 +1,37 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
 import { formatCarName, getUserTierInfo } from '../../utils/userUtils'
 import NotificationCenter from './NotificationCenter'
 
 const Navbar = ({ user, onLogout }) => {
   const location = useLocation()
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef(null)
 
   const isActive = (path) => {
     return location.pathname === path
   }
 
   const tierInfo = getUserTierInfo(user)
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  const handleLogout = () => {
+    setShowUserMenu(false)
+    onLogout()
+  }
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-white shadow-lg z-50">
@@ -100,23 +122,63 @@ const Navbar = ({ user, onLogout }) => {
             </div>
 
             {/* User Menu */}
-            <div className="flex items-center space-x-3">
-              <div className="text-right hidden sm:block">
-                <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                <div className="text-xs text-gray-500">{formatCarName(user)}</div>
+            <div className="relative" ref={userMenuRef}>
+              <div className="flex items-center space-x-3">
+                <div className="text-right hidden sm:block">
+                  <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                  <div className="text-xs text-gray-500">{formatCarName(user)}</div>
+                </div>
+                
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  {user.name.charAt(0).toUpperCase()}
+                </button>
               </div>
-              
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              
-              <button
-                onClick={onLogout}
-                className="text-gray-500 hover:text-gray-700 text-sm"
-                title="Logout"
-              >
-                🚪
-              </button>
+
+              {/* Dropdown Menu */}
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                  <Link
+                    to="/profile"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setShowUserMenu(false)}
+                  >
+                    👤 My Profile
+                  </Link>
+                  <Link
+                    to="/trips"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setShowUserMenu(false)}
+                  >
+                    🚗 My Trips
+                  </Link>
+                  <Link
+                    to="/notifications"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setShowUserMenu(false)}
+                  >
+                    🔔 Notifications
+                  </Link>
+                  {user?.role === 'admin' && (
+                    <Link
+                      to="/admin"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      ⚙️ Admin Panel
+                    </Link>
+                  )}
+                  <div className="border-t border-gray-100"></div>
+                  <button
+                    onClick={handleLogout}
+                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    🚪 Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -133,11 +195,10 @@ const Navbar = ({ user, onLogout }) => {
             </div>
             
             <button
-              onClick={onLogout}
-              className="text-gray-500 hover:text-gray-700"
-              title="Logout"
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold hover:bg-blue-700 transition-colors"
             >
-              🚪
+              {user.name.charAt(0).toUpperCase()}
             </button>
           </div>
         </div>

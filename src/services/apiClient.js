@@ -8,7 +8,7 @@ class ApiClient {
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken'); // Changed from 'token' to 'authToken'
     
     const config = {
       headers: {

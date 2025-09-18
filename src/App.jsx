@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { authAPI } from './services'
 import { getStoredUser, setStoredUser, clearStoredUser, handleAPIError } from './utils/authUtils'
+import sessionManager from './utils/sessionManager'
 
 // Import pages
 import {
@@ -19,11 +20,13 @@ import {
 
 // Import components
 import { Navbar } from './components'
+import SessionWarningModal from './components/ui/SessionWarningModal'
 
 function App() {
   const [user, setUser] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showSessionWarning, setShowSessionWarning] = useState(false)
 
   // Check for existing authentication on app load
   useEffect(() => {
@@ -37,6 +40,11 @@ function App() {
           const userProfile = await authAPI.getProfile()
           setUser(userProfile)
           setIsAuthenticated(true)
+          // Initialize session manager for existing session
+          sessionManager.init(
+            () => logout(), // Auto logout callback
+            () => setShowSessionWarning(true) // Session warning callback
+          )
         } catch (error) {
           // Token is invalid, clear all auth data
           console.error('Invalid token:', error)
@@ -56,6 +64,11 @@ function App() {
     setUser(userData)
     setIsAuthenticated(true)
     setStoredUser(userData)
+    // Initialize session manager
+    sessionManager.init(
+      () => logout(), // Auto logout callback
+      () => setShowSessionWarning(true) // Session warning callback
+    )
     // Token is already stored by the authAPI.login function
   }
 
@@ -63,11 +76,19 @@ function App() {
     setUser(userData)
     setIsAuthenticated(true)
     setStoredUser(userData)
+    // Initialize session manager
+    sessionManager.init(
+      () => logout(), // Auto logout callback
+      () => setShowSessionWarning(true) // Session warning callback
+    )
     // Token is already stored by the authAPI.register function
   }
 
   const logout = async () => {
     try {
+      // Destroy session manager
+      sessionManager.destroy()
+      
       // Call logout API to invalidate token on server
       await authAPI.logout()
     } catch (error) {
@@ -78,7 +99,19 @@ function App() {
     // Clear local state and storage
     setUser(null)
     setIsAuthenticated(false)
+    setShowSessionWarning(false)
     clearStoredUser()
+  }
+
+  // Handle session warning actions
+  const handleExtendSession = () => {
+    setShowSessionWarning(false)
+    sessionManager.resetTimeout()
+  }
+
+  const handleSessionLogout = () => {
+    setShowSessionWarning(false)
+    logout()
   }
 
   // Show loading spinner while checking authentication
@@ -151,6 +184,13 @@ function App() {
           />
         </Routes>
       </main>
+
+      {/* Session Warning Modal */}
+      <SessionWarningModal
+        isOpen={showSessionWarning}
+        onExtend={handleExtendSession}
+        onLogout={handleSessionLogout}
+      />
     </div>
   )
 }

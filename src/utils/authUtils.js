@@ -75,10 +75,22 @@ export const clearStoredUser = () => {
   localStorage.removeItem('authToken');
 };
 
+// Check if error indicates session expiration
+export const isSessionExpiredError = (error) => {
+  if (!error) return false
+  
+  const errorStr = error.toString().toLowerCase()
+  return errorStr.includes('401') || 
+         errorStr.includes('unauthorized') ||
+         errorStr.includes('session') ||
+         errorStr.includes('token')
+}
+
 export default {
   handleAPIError,
   isTokenExpired,
   getStoredUser,
   setStoredUser,
-  clearStoredUser
+  clearStoredUser,
+  isSessionExpiredError
 };
