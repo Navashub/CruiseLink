@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { getAllBrands, getModelsForBrand, getVariantsForModel, carTypes } from '../data/carDatabase'
-import { validateTripData } from '../utils/tripUtils'
-import { canUserCreateTrip, shouldShowUpgradePrompt } from '../utils/userUtils'
+import { getAllBrands, getModelsForBrand, getVariantsForModel, carTypes } from '../../data/carDatabase'
+import { validateTripData } from '../../utils/tripUtils'
+import { canUserCreateTrip, shouldShowUpgradePrompt } from '../../utils/userUtils'
 
 const CreateTrip = ({ user }) => {
   const navigate = useNavigate()

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { carDatabase, carTypes, getAllBrands, getModelsForBrand, getVariantsForModel } from '../data/carDatabase'
-import { validateUserData } from '../utils/userUtils'
+import { carDatabase, carTypes, getAllBrands, getModelsForBrand, getVariantsForModel } from '../../data/carDatabase'
+import { validateUserData } from '../../utils/userUtils'
 
 const RegistrationPage = ({ onRegister }) => {
   const navigate = useNavigate()

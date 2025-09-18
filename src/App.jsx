@@ -2,17 +2,19 @@ import { Routes, Route } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 
 // Import pages
-import LandingPage from './pages/LandingPage'
-import LoginPage from './pages/LoginPage'
-import RegistrationPage from './pages/RegistrationPage'
-import TripBrowser from './pages/TripBrowser'
-import CreateTrip from './pages/CreateTrip'
-import UserProfile from './pages/UserProfile'
-import TripDetails from './pages/TripDetails'
-import AdminPanel from './pages/AdminPanel'
+import {
+  LandingPage,
+  LoginPage,
+  RegistrationPage,
+  TripBrowser,
+  CreateTrip,
+  UserProfile,
+  TripDetails,
+  AdminPanel
+} from './pages'
 
 // Import components
-import Navbar from './components/Common/Navbar'
+import { Navbar } from './components'
 
 function App() {
   const [user, setUser] = useState(null)

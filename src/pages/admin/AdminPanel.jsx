@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { sampleUsers, sampleTrips, sampleNotifications } from '../data/sampleData'
+import { sampleUsers, sampleTrips, sampleNotifications } from '../../data/sampleData'
 import { Link } from 'react-router-dom'
 
 const AdminPanel = ({ user }) => {

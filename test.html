@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Colab Backend Test</title>
+</head>
+<body>
+  <h1>Test Colab Backend</h1>
+  <button onclick="callBackend()">Ping Backend</button>
+  <p id="response"></p>
+
+  <script>
+    async function callBackend() {
+      try {
+        const res = await fetch("https://api.apyhub.com/data/convert/currency/multiple", {
+          headers: {
+            "ngrok-skip-browser-warning": "true"  // 👈 skips the ngrok warning page
+          }
+        });
+        const data = await res.json();
+        document.getElementById("response").innerText = data.message;
+      } catch (err) {
+        document.getElementById("response").innerText = "Error: " + err;
+      }
+    }
+  </script>
+</body>
+</html>

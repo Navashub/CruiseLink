@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { formatCarName, getUserTierInfo, tierInfo } from '../utils/userUtils'
-import { sampleTrips } from '../data/sampleData'
+import { formatCarName, getUserTierInfo, tierInfo } from '../../utils/userUtils'
+import { sampleTrips } from '../../data/sampleData'
 
 const UserProfile = ({ user, setUser }) => {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)

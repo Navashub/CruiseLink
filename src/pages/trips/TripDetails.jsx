@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { sampleTrips, sampleUsers, getUserById, canUserJoinTrip } from '../data/sampleData'
-import { formatTripDate, getSpotsRemainingText, formatEligibleCars, getDaysUntilTrip, isUserEligibleForTrip } from '../utils/tripUtils'
+import { sampleTrips, sampleUsers, getUserById, canUserJoinTrip } from '../../data/sampleData'
+import { formatTripDate, getSpotsRemainingText, formatEligibleCars, getDaysUntilTrip, isUserEligibleForTrip } from '../../utils/tripUtils'
 
 const TripDetails = ({ user }) => {
   const { id } = useParams()

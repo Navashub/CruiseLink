@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { testCredentials, sampleUsers } from '../data/sampleData'
+import { testCredentials, sampleUsers } from '../../data/sampleData'
 
 const LoginPage = ({ onLogin }) => {
   const navigate = useNavigate()

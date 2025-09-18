@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { sampleTrips, canUserJoinTrip } from '../data/sampleData'
-import { formatTripDate, getSpotsRemainingText, formatEligibleCars, getDaysUntilTrip, sortTripsByDate, filterTripsBySearch } from '../utils/tripUtils'
-import { isUserEligibleForTrip } from '../utils/tripUtils'
+import { sampleTrips, canUserJoinTrip } from '../../data/sampleData'
+import { formatTripDate, getSpotsRemainingText, formatEligibleCars, getDaysUntilTrip, sortTripsByDate, filterTripsBySearch } from '../../utils/tripUtils'
+import { isUserEligibleForTrip } from '../../utils/tripUtils'
 
 const TripBrowser = ({ user }) => {
   const [trips, setTrips] = useState(sortTripsByDate(sampleTrips))
