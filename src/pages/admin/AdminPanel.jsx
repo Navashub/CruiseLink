@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { sampleUsers, sampleTrips, sampleNotifications } from '../../data/sampleData'
+import { roadtripsAPI } from '../../services'
 import { Link } from 'react-router-dom'
 
 const AdminPanel = ({ user }) => {
@@ -11,23 +11,38 @@ const AdminPanel = ({ user }) => {
     premiumUsers: 0,
     activeTrips: 0
   })
+  const [trips, setTrips] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Calculate stats
-    const totalUsers = sampleUsers.filter(u => u.id !== 'admin').length
-    const freeUsers = sampleUsers.filter(u => u.tier === 'free').length
-    const premiumUsers = sampleUsers.filter(u => u.tier.includes('premium')).length
-    const activeTrips = sampleTrips.filter(t => t.status === 'open').length
-
-    setStats({
-      totalUsers,
-      totalTrips: sampleTrips.length,
-      totalNotifications: sampleNotifications.length,
-      freeUsers,
-      premiumUsers,
-      activeTrips
-    })
+    loadAdminData()
   }, [])
+
+  const loadAdminData = async () => {
+    try {
+      setLoading(true)
+      const response = await roadtripsAPI.getTrips()
+      const allTrips = response.data.results || response.data
+      
+      setTrips(allTrips)
+      
+      // Calculate basic stats (would need additional API endpoints for full stats)
+      const activeTrips = allTrips.filter(t => t.status === 'open').length
+
+      setStats({
+        totalUsers: 'N/A', // Would need users API
+        totalTrips: allTrips.length,
+        totalNotifications: 'N/A', // Would need notifications API
+        freeUsers: 'N/A',
+        premiumUsers: 'N/A',
+        activeTrips
+      })
+    } catch (err) {
+      console.error('Error loading admin data:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const StatCard = ({ title, value, icon, color = 'blue' }) => {
     const borderColors = {
@@ -257,9 +272,23 @@ const AdminPanel = ({ user }) => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sampleTrips.map(trip => (
-                  <TripRow key={trip.id} trip={trip} />
-                ))}
+                {loading ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-4 text-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    </td>
+                  </tr>
+                ) : trips.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                      No trips found
+                    </td>
+                  </tr>
+                ) : (
+                  trips.map(trip => (
+                    <TripRow key={trip.id} trip={trip} />
+                  ))
+                )}
               </tbody>
             </table>
           </div>

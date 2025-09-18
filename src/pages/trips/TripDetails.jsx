@@ -1,359 +1,376 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { sampleTrips, sampleUsers, getUserById, canUserJoinTrip } from '../../data/sampleData'
-import { formatTripDate, getSpotsRemainingText, formatEligibleCars, getDaysUntilTrip, isUserEligibleForTrip } from '../../utils/tripUtils'
+import React, { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { roadtripsAPI } from '../../services'
 
-const TripDetails = ({ user }) => {
+const TripDetails = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const [trip, setTrip] = useState(null)
   const [participants, setParticipants] = useState([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [showParticipants, setShowParticipants] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [actionLoading, setActionLoading] = useState(false)
 
   useEffect(() => {
-    const foundTrip = sampleTrips.find(t => t.id === id)
-    if (foundTrip) {
-      setTrip(foundTrip)
-      // Get participant details
-      const participantDetails = foundTrip.participants.map(participantId => 
-        getUserById(participantId) || sampleUsers.find(u => u.id === participantId)
-      ).filter(Boolean)
-      setParticipants(participantDetails)
-    }
+    loadTripDetails()
   }, [id])
 
-  const handleJoinTrip = async () => {
-    if (!canUserJoinTrip(user, trip)) return
-    
-    setIsLoading(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Update trip participants
-    const updatedTrip = {
-      ...trip,
-      participants: [...trip.participants, user.id]
+  const loadTripDetails = async () => {
+    try {
+      setLoading(true)
+      const [tripResponse, participantsResponse] = await Promise.all([
+        roadtripsAPI.getTrip(id),
+        roadtripsAPI.getTripParticipants(id)
+      ])
+      setTrip(tripResponse.data)
+      setParticipants(participantsResponse.data.results || participantsResponse.data)
+    } catch (err) {
+      setError('Failed to load trip details')
+      console.error('Error loading trip details:', err)
+    } finally {
+      setLoading(false)
     }
-    
-    setTrip(updatedTrip)
-    setParticipants(prev => [...prev, user])
-    setIsLoading(false)
+  }
+
+  const handleJoinTrip = async () => {
+    try {
+      setActionLoading(true)
+      await roadtripsAPI.joinTrip(id)
+      await loadTripDetails() // Refresh data
+    } catch (err) {
+      setError('Failed to join trip')
+      console.error('Error joining trip:', err)
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   const handleLeaveTrip = async () => {
-    setIsLoading(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Update trip participants
-    const updatedTrip = {
-      ...trip,
-      participants: trip.participants.filter(id => id !== user.id)
+    if (!window.confirm('Are you sure you want to leave this trip?')) {
+      return
     }
-    
-    setTrip(updatedTrip)
-    setParticipants(prev => prev.filter(p => p.id !== user.id))
-    setIsLoading(false)
+
+    try {
+      setActionLoading(true)
+      await roadtripsAPI.leaveTrip(id)
+      await loadTripDetails() // Refresh data
+    } catch (err) {
+      setError('Failed to leave trip')
+      console.error('Error leaving trip:', err)
+    } finally {
+      setActionLoading(false)
+    }
   }
 
-  if (!trip) {
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const getDifficultyColor = (level) => {
+    const colors = {
+      'easy': 'bg-green-100 text-green-800',
+      'moderate': 'bg-yellow-100 text-yellow-800',
+      'challenging': 'bg-orange-100 text-orange-800',
+      'expert': 'bg-red-100 text-red-800'
+    }
+    return colors[level] || 'bg-gray-100 text-gray-800'
+  }
+
+  const getStatusColor = (status) => {
+    const colors = {
+      'open': 'bg-blue-100 text-blue-800',
+      'full': 'bg-red-100 text-red-800',
+      'in_progress': 'bg-purple-100 text-purple-800',
+      'completed': 'bg-green-100 text-green-800',
+      'cancelled': 'bg-gray-100 text-gray-800'
+    }
+    return colors[status] || 'bg-gray-100 text-gray-800'
+  }
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-            <div className="text-6xl mb-4">🔍</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Trip Not Found</h2>
-            <p className="text-gray-600 mb-6">
-              The trip you're looking for doesn't exist or has been removed.
-            </p>
-            <Link 
-              to="/trips"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors hover-lift inline-block"
-            >
-              Browse Other Trips
-            </Link>
-          </div>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       </div>
     )
   }
 
-  const isEligible = isUserEligibleForTrip(user, trip)
-  const hasJoined = trip.participants.includes(user.id)
-  const canJoin = canUserJoinTrip(user, trip)
-  const spotsLeft = trip.maxCapacity - trip.participants.length
-  const daysUntil = getDaysUntilTrip(trip.departureDate)
-  const isOrganizer = trip.organizerId === user.id
-
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Back Button */}
-        <div className="mb-6">
-          <button 
-            onClick={() => navigate(-1)}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+  if (error || !trip) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <div className="text-6xl mb-4">😞</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Trip Not Found</h2>
+          <p className="text-gray-600 mb-6">{error || 'This trip does not exist or has been removed.'}</p>
+          <button
+            onClick={() => navigate('/trips')}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            ← Back
+            Back to Trips
           </button>
         </div>
+      </div>
+    )
+  }
 
-        {/* Trip Header */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
-          <div className="gradient-automotive p-8 text-white">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h1 className="text-3xl font-bold mb-3">{trip.title}</h1>
-                <p className="text-blue-100 text-lg flex items-center mb-4">
-                  <span className="mr-3">📍</span>
-                  {trip.destination}
-                </p>
-                
-                <div className="flex items-center space-x-6 text-sm">
-                  <span className="flex items-center">
-                    <span className="mr-2">📅</span>
-                    {daysUntil}
-                  </span>
-                  <span className="flex items-center">
-                    <span className="mr-2">👤</span>
-                    Organized by {trip.organizer}
-                  </span>
-                  <span className="flex items-center">
-                    <span className="mr-2">🚗</span>
-                    {trip.participants.length}/{trip.maxCapacity} joined
-                  </span>
-                </div>
-              </div>
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
+  const isParticipant = participants.some(p => p.user?.id === currentUser.id)
+  const isOrganizer = trip.organizer?.id === currentUser.id
+  const canJoin = trip.status === 'open' && !isParticipant && participants.length < trip.maxParticipants
 
-              <div className={`px-4 py-2 rounded-full text-sm font-medium ${
-                spotsLeft === 0 ? 'bg-red-500' :
-                spotsLeft <= 5 ? 'bg-yellow-500' : 'bg-green-500'
-              }`}>
-                {getSpotsRemainingText(trip)}
-              </div>
-            </div>
+  return (
+    <div className="container mx-auto px-4 py-8">
+      {/* Back Button */}
+      <button
+        onClick={() => navigate('/trips')}
+        className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+      >
+        <span className="mr-2">←</span>
+        Back to Trips
+      </button>
 
-            {/* Action Button */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                {isOrganizer && (
-                  <span className="bg-yellow-500 bg-opacity-20 text-yellow-100 px-3 py-1 rounded-full text-sm font-medium">
-                    👑 Your Trip
-                  </span>
-                )}
-                {hasJoined && !isOrganizer && (
-                  <span className="bg-green-500 bg-opacity-20 text-green-100 px-3 py-1 rounded-full text-sm font-medium">
-                    ✅ Joined
-                  </span>
-                )}
-                {!isEligible && (
-                  <span className="bg-red-500 bg-opacity-20 text-red-100 px-3 py-1 rounded-full text-sm font-medium">
-                    🚫 Not Eligible
-                  </span>
-                )}
-              </div>
-
-              {!isOrganizer && (
-                <div>
-                  {hasJoined ? (
-                    <button
-                      onClick={handleLeaveTrip}
-                      disabled={isLoading}
-                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
-                    >
-                      {isLoading ? '⏳ Leaving...' : '❌ Leave Trip'}
-                    </button>
-                  ) : isEligible && canJoin ? (
-                    <button
-                      onClick={handleJoinTrip}
-                      disabled={isLoading}
-                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
-                    >
-                      {isLoading ? '⏳ Joining...' : '✅ Join Trip'}
-                    </button>
-                  ) : !isEligible ? (
-                    <div className="bg-gray-500 text-white px-6 py-3 rounded-lg font-medium cursor-not-allowed opacity-75">
-                      🚫 Not Eligible
-                    </div>
-                  ) : (
-                    <div className="bg-gray-500 text-white px-6 py-3 rounded-lg font-medium cursor-not-allowed opacity-75">
-                      😔 Trip Full
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          {error}
         </div>
+      )}
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Trip Details */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Basic Info */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Trip Information</h2>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">📅 Departure</h3>
-                  <p className="text-gray-900 font-medium">{formatTripDate(trip.departureDate)}</p>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">🚗 Meeting Point</h3>
-                  <p className="text-gray-900">{trip.meetingPoint}</p>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">🚙 Eligible Cars</h3>
-                  <p className="text-gray-900">{formatEligibleCars(trip.eligibleCars)}</p>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">👥 Capacity</h3>
-                  <p className="text-gray-900">{trip.participants.length} / {trip.maxCapacity} participants</p>
+      <div className="grid lg:grid-cols-3 gap-8">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Trip Header */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">{trip.title}</h1>
+                <div className="flex gap-2">
+                  <span className={`px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(trip.status)}`}>
+                    {trip.status.replace('_', ' ')}
+                  </span>
+                  <span className={`px-3 py-1 text-sm font-medium rounded-full ${getDifficultyColor(trip.difficultyLevel)}`}>
+                    {trip.difficultyLevel}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Description */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">About This Trip</h2>
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line">{trip.description}</p>
-            </div>
-
-            {/* Eligibility Check */}
-            {!isEligible && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-red-900 mb-3">🚫 Not Eligible</h3>
-                <p className="text-red-700 mb-4">
-                  Your {user.carBrand} {user.carVariant} ({user.carType}) doesn't match the eligibility criteria for this trip.
-                </p>
-                
-                <div className="bg-white border border-red-200 rounded-lg p-4">
-                  <h4 className="font-medium text-red-900 mb-2">This trip is open to:</h4>
-                  <p className="text-red-700 text-sm">{formatEligibleCars(trip.eligibleCars)}</p>
-                </div>
-                
-                <div className="mt-4">
-                  <Link 
-                    to="/trips"
-                    className="text-red-600 hover:text-red-800 text-sm font-medium"
-                  >
-                    Find trips for your car →
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Organizer Info */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Trip Organizer</h3>
-              
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white text-lg font-bold">
-                  {trip.organizer.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div className="font-medium text-gray-900">{trip.organizer}</div>
-                  <div className="text-sm text-gray-500">Trip Organizer</div>
-                </div>
-              </div>
-              
-              {isOrganizer && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-yellow-800 text-sm font-medium">
-                    👑 This is your trip! Manage participants and trip details.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Participants */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900">
-                  Participants ({participants.length})
-                </h3>
-                {participants.length > 3 && (
-                  <button
-                    onClick={() => setShowParticipants(!showParticipants)}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                  >
-                    {showParticipants ? 'Show Less' : 'Show All'}
-                  </button>
-                )}
-              </div>
-              
+            <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-3">
-                {participants.length > 0 ? (
-                  <>
-                    {(showParticipants ? participants : participants.slice(0, 3)).map(participant => (
-                      <div key={participant.id} className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                          {participant.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 truncate">
-                            {participant.name}
-                            {participant.id === trip.organizerId && ' 👑'}
-                            {participant.id === user.id && ' (You)'}
-                          </div>
-                          <div className="text-sm text-gray-500 truncate">
-                            {participant.carBrand} {participant.carVariant}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {!showParticipants && participants.length > 3 && (
-                      <div className="text-sm text-gray-500 text-center pt-2">
-                        +{participants.length - 3} more participants
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="text-4xl mb-2">👥</div>
-                    <p className="text-gray-500 text-sm">No participants yet</p>
-                    <p className="text-gray-400 text-xs mt-1">Be the first to join!</p>
+                <div className="flex items-center">
+                  <span className="w-5 h-5 mr-3 text-gray-500">📍</span>
+                  <div>
+                    <div className="font-medium">Destination</div>
+                    <div className="text-gray-600">{trip.destination}</div>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <span className="w-5 h-5 mr-3 text-gray-500">📅</span>
+                  <div>
+                    <div className="font-medium">Departure</div>
+                    <div className="text-gray-600">{formatDate(trip.departureDateTime)}</div>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <span className="w-5 h-5 mr-3 text-gray-500">📍</span>
+                  <div>
+                    <div className="font-medium">Meeting Point</div>
+                    <div className="text-gray-600">{trip.meetingPoint}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center">
+                  <span className="w-5 h-5 mr-3 text-gray-500">👥</span>
+                  <div>
+                    <div className="font-medium">Participants</div>
+                    <div className="text-gray-600">{participants.length} / {trip.maxParticipants}</div>
+                  </div>
+                </div>
+                {trip.estimatedDuration && (
+                  <div className="flex items-center">
+                    <span className="w-5 h-5 mr-3 text-gray-500">⏱️</span>
+                    <div>
+                      <div className="font-medium">Duration</div>
+                      <div className="text-gray-600">{trip.estimatedDuration}</div>
+                    </div>
+                  </div>
+                )}
+                {trip.estimatedDistance && (
+                  <div className="flex items-center">
+                    <span className="w-5 h-5 mr-3 text-gray-500">🛣️</span>
+                    <div>
+                      <div className="font-medium">Distance</div>
+                      <div className="text-gray-600">{trip.estimatedDistance}</div>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Quick Actions */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
-              
+          {/* Description */}
+          {trip.description && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-xl font-semibold mb-4">About This Trip</h2>
+              <p className="text-gray-600 whitespace-pre-wrap">{trip.description}</p>
+            </div>
+          )}
+
+          {/* Car Eligibility */}
+          {(trip.eligibleBrands?.length > 0 || trip.eligibleModels?.length > 0 || trip.eligibleTypes?.length > 0) && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-xl font-semibold mb-4">Eligible Cars</h2>
               <div className="space-y-3">
-                <Link
-                  to="/trips"
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-medium transition-colors text-center block"
-                >
-                  🔍 Browse More Trips
-                </Link>
-                
-                <Link
-                  to="/create-trip"
-                  className="w-full bg-blue-100 hover:bg-blue-200 text-blue-700 py-3 px-4 rounded-lg font-medium transition-colors text-center block"
-                >
-                  ➕ Create Your Own Trip
-                </Link>
-                
-                <Link
-                  to="/profile"
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-medium transition-colors text-center block"
-                >
-                  👤 View My Profile
-                </Link>
+                {trip.eligibleBrands?.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700">Brands</h3>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {trip.eligibleBrands.map((brand, index) => (
+                        <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded">
+                          {brand.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {trip.eligibleModels?.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700">Models</h3>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {trip.eligibleModels.map((model, index) => (
+                        <span key={index} className="px-2 py-1 bg-green-100 text-green-800 text-sm rounded">
+                          {model.brand} {model.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {trip.eligibleTypes?.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700">Types</h3>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {trip.eligibleTypes.map((type, index) => (
+                        <span key={index} className="px-2 py-1 bg-purple-100 text-purple-800 text-sm rounded">
+                          {type.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Actions */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-xl font-semibold mb-4">Actions</h2>
+            <div className="space-y-3">
+              {canJoin && (
+                <button
+                  onClick={handleJoinTrip}
+                  disabled={actionLoading}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {actionLoading ? 'Joining...' : 'Join Trip'}
+                </button>
+              )}
+              
+              {isParticipant && !isOrganizer && (
+                <button
+                  onClick={handleLeaveTrip}
+                  disabled={actionLoading}
+                  className="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {actionLoading ? 'Leaving...' : 'Leave Trip'}
+                </button>
+              )}
+
+              {isOrganizer && (
+                <button
+                  onClick={() => navigate(`/trips/${trip.id}/edit`)}
+                  className="w-full bg-gray-600 text-white py-3 rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Edit Trip
+                </button>
+              )}
+
+              {!canJoin && !isParticipant && trip.status === 'open' && (
+                <div className="text-center text-gray-600 py-3">
+                  Trip is full
+                </div>
+              )}
+
+              {trip.status !== 'open' && !isParticipant && (
+                <div className="text-center text-gray-600 py-3">
+                  Trip is {trip.status.replace('_', ' ')}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Organizer */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-xl font-semibold mb-4">Organizer</h2>
+            <div className="flex items-center">
+              <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center mr-3">
+                <span className="text-gray-600 font-medium">
+                  {trip.organizer?.firstName?.[0]}{trip.organizer?.lastName?.[0]}
+                </span>
+              </div>
+              <div>
+                <div className="font-medium">
+                  {trip.organizer?.firstName} {trip.organizer?.lastName}
+                </div>
+                <div className="text-sm text-gray-600">
+                  {trip.organizer?.email}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Participants */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-xl font-semibold mb-4">
+              Participants ({participants.length}/{trip.maxParticipants})
+            </h2>
+            <div className="space-y-3">
+              {participants.length === 0 ? (
+                <p className="text-gray-600 text-center py-4">No participants yet</p>
+              ) : (
+                participants.map((participant) => (
+                  <div key={participant.id} className="flex items-center">
+                    <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center mr-3">
+                      <span className="text-gray-600 text-sm font-medium">
+                        {participant.user?.firstName?.[0]}{participant.user?.lastName?.[0]}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">
+                        {participant.user?.firstName} {participant.user?.lastName}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Joined {new Date(participant.joinedAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    {participant.user?.id === trip.organizer?.id && (
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">
+                        Organizer
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

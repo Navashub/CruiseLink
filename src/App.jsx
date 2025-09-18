@@ -12,6 +12,8 @@ import {
   CreateTrip,
   UserProfile,
   TripDetails,
+  TripsList,
+  Notifications,
   AdminPanel
 } from './pages'
 
@@ -117,11 +119,23 @@ function App() {
           />
           <Route 
             path="/trips" 
-            element={<TripBrowser user={user} />} 
+            element={<TripsList user={user} />} 
           />
           <Route 
             path="/create-trip" 
             element={<CreateTrip user={user} />} 
+          />
+          <Route 
+            path="/trips/create" 
+            element={<CreateTrip user={user} />} 
+          />
+          <Route 
+            path="/trips/:id" 
+            element={<TripDetails user={user} />} 
+          />
+          <Route 
+            path="/notifications" 
+            element={<Notifications user={user} />} 
           />
           <Route 
             path="/profile" 

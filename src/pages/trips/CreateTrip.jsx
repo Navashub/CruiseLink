@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { getAllBrands, getModelsForBrand, getVariantsForModel, carTypes } from '../../data/carDatabase'
+import { roadtripsAPI } from '../../services/roadtripsService'
+import { carService } from '../../services/carService'
 import { validateTripData } from '../../utils/tripUtils'
 import { canUserCreateTrip, shouldShowUpgradePrompt } from '../../utils/userUtils'
 
@@ -13,6 +14,10 @@ const CreateTrip = ({ user }) => {
     departureDate: '',
     meetingPoint: '',
     description: '',
+    maxParticipants: 20,
+    estimatedDuration: '',
+    estimatedDistance: '',
+    difficultyLevel: 'easy',
     eligibleCars: {
       brands: [],
       models: [],
@@ -22,10 +27,44 @@ const CreateTrip = ({ user }) => {
   const [errors, setErrors] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  
+  // Car data for eligibility selection
+  const [carData, setCarData] = useState({
+    brands: [],
+    models: [],
+    types: []
+  })
+  const [loadingCarData, setLoadingCarData] = useState(true)
 
   // Check if user can create trip
   const canCreate = canUserCreateTrip(user)
   const needsUpgrade = shouldShowUpgradePrompt(user)
+
+  // Load car data for eligibility selection
+  useEffect(() => {
+    const loadCarData = async () => {
+      try {
+        setLoadingCarData(true)
+        const [brandsResponse, typesResponse] = await Promise.all([
+          carService.getBrandsWithModels(),
+          carService.getCarTypes()
+        ])
+        
+        setCarData({
+          brands: brandsResponse.data,
+          models: [], // Models will be loaded dynamically
+          types: typesResponse.data
+        })
+      } catch (error) {
+        console.error('Error loading car data:', error)
+        setErrors(['Failed to load car data. Please refresh the page.'])
+      } finally {
+        setLoadingCarData(false)
+      }
+    }
+    
+    loadCarData()
+  }, [])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -107,12 +146,52 @@ const CreateTrip = ({ user }) => {
     }
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // Prepare trip data for API
+      const tripData = {
+        title: formData.title,
+        destination: formData.destination,
+        departure_date: formData.departureDate,
+        meeting_point: formData.meetingPoint,
+        description: formData.description,
+        max_participants: formData.maxParticipants,
+        estimated_duration: formData.estimatedDuration,
+        estimated_distance: formData.estimatedDistance,
+        difficulty_level: formData.difficultyLevel,
+        eligibility: {
+          eligible_brands: formData.eligibleCars.brands,
+          eligible_models: formData.eligibleCars.models,
+          eligible_types: formData.eligibleCars.types,
+          open_to_all: formData.eligibleCars.brands.length === 0 && 
+                      formData.eligibleCars.models.length === 0 && 
+                      formData.eligibleCars.types.length === 0
+        }
+      }
       
-      // Success - redirect to trips browser
-      navigate('/trips')
+      const response = await roadtripsAPI.createTrip(tripData)
+      
+      // Success - redirect to trip details
+      navigate(`/trips/${response.id}`)
     } catch (error) {
-      setErrors(['Failed to create trip. Please try again.'])
+      console.error('Error creating trip:', error)
+      if (error.response?.data) {
+        // Handle API validation errors
+        const apiErrors = []
+        const errorData = error.response.data
+        
+        if (typeof errorData === 'object') {
+          Object.keys(errorData).forEach(field => {
+            if (Array.isArray(errorData[field])) {
+              apiErrors.push(...errorData[field])
+            } else if (typeof errorData[field] === 'string') {
+              apiErrors.push(errorData[field])
+            }
+          })
+        }
+        
+        setErrors(apiErrors.length > 0 ? apiErrors : ['Failed to create trip. Please try again.'])
+      } else {
+        setErrors(['Failed to create trip. Please check your connection and try again.'])
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -284,6 +363,67 @@ const CreateTrip = ({ user }) => {
                   />
                 </div>
               </div>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Max Participants
+                  </label>
+                  <input
+                    type="number"
+                    name="maxParticipants"
+                    value={formData.maxParticipants}
+                    onChange={handleInputChange}
+                    min="1"
+                    max="50"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Estimated Duration
+                  </label>
+                  <input
+                    type="text"
+                    name="estimatedDuration"
+                    value={formData.estimatedDuration}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., 2 days, 6 hours"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Estimated Distance
+                  </label>
+                  <input
+                    type="text"
+                    name="estimatedDistance"
+                    value={formData.estimatedDistance}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., 500 miles, 800 km"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Difficulty Level
+                </label>
+                <select
+                  name="difficultyLevel"
+                  value={formData.difficultyLevel}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="easy">Easy - Relaxed pace, good roads</option>
+                  <option value="moderate">Moderate - Some challenging sections</option>
+                  <option value="challenging">Challenging - Difficult roads, experienced drivers</option>
+                </select>
+              </div>
             </div>
           )}
 
@@ -334,69 +474,76 @@ const CreateTrip = ({ user }) => {
                 <p className="text-gray-600">Select which cars are eligible for this trip</p>
               </div>
 
-              {/* Brands */}
-              <div>
-                <h4 className="text-lg font-medium text-gray-900 mb-4">By Brand</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {getAllBrands().map(brand => (
-                    <label key={brand} className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.eligibleCars.brands.includes(brand)}
-                        onChange={(e) => handleCarSelectionChange('brands', brand, e.target.checked)}
-                        className="text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm font-medium">{brand}</span>
-                    </label>
-                  ))}
+              {loadingCarData ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <p className="mt-2 text-gray-600">Loading car data...</p>
                 </div>
-              </div>
-
-              {/* Specific Models */}
-              <div>
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Specific Models</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {getAllBrands().map(brand => 
-                    getModelsForBrand(brand).map(model => {
-                      const fullModel = `${brand} ${model}`
-                      return (
-                        <label key={fullModel} className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+              ) : (
+                <>
+                  {/* Brands */}
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">By Brand</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {carData.brands.map(brand => (
+                        <label key={brand.id} className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={formData.eligibleCars.models.includes(fullModel)}
-                            onChange={(e) => handleCarSelectionChange('models', fullModel, e.target.checked)}
+                            checked={formData.eligibleCars.brands.includes(brand.id)}
+                            onChange={(e) => handleCarSelectionChange('brands', brand.id, e.target.checked)}
                             className="text-blue-600 focus:ring-blue-500"
                           />
-                          <span className="text-xs font-medium">{fullModel}</span>
+                          <span className="text-sm font-medium">{brand.name}</span>
                         </label>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* Car Types */}
-              <div>
-                <h4 className="text-lg font-medium text-gray-900 mb-4">By Type</h4>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  {carTypes.map(type => (
-                    <label key={type} className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.eligibleCars.types.includes(type)}
-                        onChange={(e) => handleCarSelectionChange('types', type, e.target.checked)}
-                        className="text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm font-medium">{type}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+                  {/* Specific Models */}
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">Specific Models</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {carData.brands.map(brand => 
+                        brand.models?.map(model => (
+                          <label key={model.id} className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.eligibleCars.models.includes(model.id)}
+                              onChange={(e) => handleCarSelectionChange('models', model.id, e.target.checked)}
+                              className="text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-xs font-medium">{brand.name} {model.name}</span>
+                          </label>
+                        )) || []
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Car Types */}
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">By Type</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      {carData.types.map(type => (
+                        <label key={type.id} className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.eligibleCars.types.includes(type.id)}
+                            onChange={(e) => handleCarSelectionChange('types', type.id, e.target.checked)}
+                            className="text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm font-medium">{type.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <p className="text-yellow-800 text-sm">
                   <span className="font-medium">Note:</span> Users will be eligible if their car matches ANY of the selected criteria.
                   For example, selecting "BMW" and "Sports Car" means both BMW owners AND sports car owners can join.
+                  If no criteria are selected, the trip will be open to all cars.
                 </p>
               </div>
             </div>
@@ -430,14 +577,51 @@ const CreateTrip = ({ user }) => {
                   <h4 className="font-medium text-gray-700">Meeting Point</h4>
                   <p className="text-gray-900">{formData.meetingPoint}</p>
                 </div>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <h4 className="font-medium text-gray-700">Max Participants</h4>
+                    <p className="text-gray-900">{formData.maxParticipants}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-700">Difficulty</h4>
+                    <p className="text-gray-900 capitalize">{formData.difficultyLevel}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-700">Duration</h4>
+                    <p className="text-gray-900">{formData.estimatedDuration || 'Not specified'}</p>
+                  </div>
+                </div>
                 <div>
                   <h4 className="font-medium text-gray-700">Eligible Cars</h4>
                   <p className="text-gray-900">
-                    {[
-                      ...formData.eligibleCars.brands,
-                      ...formData.eligibleCars.models,
-                      ...formData.eligibleCars.types
-                    ].join(', ') || 'All cars welcome'}
+                    {(() => {
+                      const eligibleItems = []
+                      
+                      // Add selected brands
+                      const selectedBrands = carData.brands.filter(brand => 
+                        formData.eligibleCars.brands.includes(brand.id)
+                      ).map(brand => brand.name)
+                      eligibleItems.push(...selectedBrands)
+                      
+                      // Add selected models
+                      const selectedModels = []
+                      carData.brands.forEach(brand => {
+                        brand.models?.forEach(model => {
+                          if (formData.eligibleCars.models.includes(model.id)) {
+                            selectedModels.push(`${brand.name} ${model.name}`)
+                          }
+                        })
+                      })
+                      eligibleItems.push(...selectedModels)
+                      
+                      // Add selected types
+                      const selectedTypes = carData.types.filter(type => 
+                        formData.eligibleCars.types.includes(type.id)
+                      ).map(type => type.name)
+                      eligibleItems.push(...selectedTypes)
+                      
+                      return eligibleItems.length > 0 ? eligibleItems.join(', ') : 'All cars welcome'
+                    })()}
                   </p>
                 </div>
               </div>

@@ -1,71 +1,126 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { sampleTrips, canUserJoinTrip } from '../../data/sampleData'
-import { formatTripDate, getSpotsRemainingText, formatEligibleCars, getDaysUntilTrip, sortTripsByDate, filterTripsBySearch } from '../../utils/tripUtils'
-import { isUserEligibleForTrip } from '../../utils/tripUtils'
+import { Link, useNavigate } from 'react-router-dom'
+import { roadtripsAPI } from '../../services'
+import { formatTripDate, getSpotsRemainingText, formatEligibleCars, getDaysUntilTrip } from '../../utils/tripUtils'
 
 const TripBrowser = ({ user }) => {
-  const [trips, setTrips] = useState(sortTripsByDate(sampleTrips))
-  const [filteredTrips, setFilteredTrips] = useState(trips)
+  const navigate = useNavigate()
+  const [trips, setTrips] = useState([])
+  const [filteredTrips, setFilteredTrips] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState('all') // all, eligible, joined
   const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    let filtered = filterTripsBySearch(trips, searchQuery)
+    loadTrips()
+  }, [])
+
+  useEffect(() => {
+    loadTrips()
+  }, [])
+
+  const loadTrips = async () => {
+    try {
+      setLoading(true)
+      const response = await roadtripsAPI.getTrips()
+      const tripsData = response.data.results || response.data
+      setTrips(tripsData)
+      setFilteredTrips(tripsData)
+    } catch (err) {
+      setError('Failed to load trips')
+      console.error('Error loading trips:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    let filtered = trips.filter(trip => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        return trip.title.toLowerCase().includes(query) ||
+               trip.destination.toLowerCase().includes(query) ||
+               trip.description?.toLowerCase().includes(query)
+      }
+      return true
+    })
     
+    // Type filter
     if (filterType === 'eligible') {
-      filtered = filtered.filter(trip => isUserEligibleForTrip(user, trip))
+      // Filter trips that user is eligible for based on car
+      filtered = filtered.filter(trip => {
+        // If no specific eligibility requirements, all cars are welcome
+        if (!trip.eligibleBrands?.length && !trip.eligibleModels?.length && !trip.eligibleTypes?.length) {
+          return true
+        }
+        
+        // Check if user's car matches any of the eligibility criteria
+        const userCar = user.car
+        if (!userCar) return false
+        
+        // Check brand eligibility
+        if (trip.eligibleBrands?.some(brand => brand.id === userCar.brandId)) return true
+        
+        // Check model eligibility
+        if (trip.eligibleModels?.some(model => model.id === userCar.modelId)) return true
+        
+        // Check type eligibility
+        if (trip.eligibleTypes?.some(type => type.id === userCar.typeId)) return true
+        
+        return false
+      })
     } else if (filterType === 'joined') {
-      filtered = filtered.filter(trip => trip.participants.includes(user.id))
+      // This would need to be implemented with actual participation data
+      filtered = []
     }
     
     setFilteredTrips(filtered)
   }, [trips, searchQuery, filterType, user])
 
   const handleJoinTrip = async (tripId) => {
-    if (!canUserJoinTrip(user, trips.find(t => t.id === tripId))) return
-    
-    setIsLoading(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    setTrips(prevTrips => 
-      prevTrips.map(trip => 
-        trip.id === tripId 
-          ? { ...trip, participants: [...trip.participants, user.id] }
-          : trip
-      )
-    )
-    
-    setIsLoading(false)
+    try {
+      setIsLoading(true)
+      await roadtripsAPI.joinTrip(tripId)
+      await loadTrips() // Refresh trips to show updated data
+    } catch (err) {
+      setError('Failed to join trip')
+      console.error('Error joining trip:', err)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleLeaveTrip = async (tripId) => {
-    setIsLoading(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    setTrips(prevTrips => 
-      prevTrips.map(trip => 
-        trip.id === tripId 
-          ? { ...trip, participants: trip.participants.filter(id => id !== user.id) }
-          : trip
-      )
-    )
-    
-    setIsLoading(false)
+    try {
+      setIsLoading(true)
+      await roadtripsAPI.leaveTrip(tripId)
+      await loadTrips() // Refresh trips to show updated data
+    } catch (err) {
+      setError('Failed to leave trip')
+      console.error('Error leaving trip:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   const TripCard = ({ trip }) => {
-    const isEligible = isUserEligibleForTrip(user, trip)
-    const hasJoined = trip.participants.includes(user.id)
-    const canJoin = canUserJoinTrip(user, trip)
-    const spotsLeft = trip.maxCapacity - trip.participants.length
-    const daysUntil = getDaysUntilTrip(trip.departureDate)
-
+    const currentUser = user
+    const isParticipant = trip.participants?.some(p => p.user?.id === currentUser.id) || false
+    const canJoin = trip.status === 'open' && !isParticipant && trip.currentParticipants < trip.maxParticipants
+    const spotsLeft = trip.maxParticipants - (trip.currentParticipants || 0)
     return (
       <div className="bg-white rounded-xl shadow-lg hover-lift overflow-hidden">
         {/* Trip Header */}
@@ -172,6 +227,28 @@ const TripBrowser = ({ user }) => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+            {error}
+            <button 
+              onClick={loadTrips}
+              className="ml-4 text-red-800 underline hover:no-underline"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {!loading && (
+          <>
         {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
@@ -180,7 +257,7 @@ const TripBrowser = ({ user }) => {
               <p className="text-gray-600">Find the perfect convoy adventure for your car</p>
             </div>
             <Link
-              to="/create-trip"
+              to="/trips/create"
               className="mt-4 sm:mt-0 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors hover-lift inline-block text-center"
             >
               ➕ Create Trip
@@ -261,12 +338,14 @@ const TripBrowser = ({ user }) => {
               }
             </p>
             <Link
-              to="/create-trip"
+              to="/trips/create"
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors hover-lift inline-block"
             >
               Create Your First Trip
             </Link>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

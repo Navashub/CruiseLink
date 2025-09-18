@@ -1,20 +1,45 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { formatCarName, getUserTierInfo, tierInfo } from '../../utils/userUtils'
-import { sampleTrips } from '../../data/sampleData'
+import { roadtripsAPI } from '../../services'
 
 const UserProfile = ({ user, setUser }) => {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [selectedTier, setSelectedTier] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [userTrips, setUserTrips] = useState([])
+  const [loading, setLoading] = useState(true)
   
   const currentTierInfo = getUserTierInfo(user)
+
+  useEffect(() => {
+    loadUserTrips()
+  }, [user])
+
+  const loadUserTrips = async () => {
+    try {
+      setLoading(true)
+      const response = await roadtripsAPI.getTrips()
+      const allTrips = response.data.results || response.data
+      
+      // Filter trips organized by user and trips user has joined
+      const organizedTrips = allTrips.filter(trip => trip.organizer?.id === user.id)
+      const joinedTrips = allTrips.filter(trip => 
+        trip.participants?.some(p => p.user?.id === user.id) && trip.organizer?.id !== user.id
+      )
+      
+      setUserTrips({ organized: organizedTrips, joined: joinedTrips })
+    } catch (err) {
+      console.error('Error loading user trips:', err)
+      setUserTrips({ organized: [], joined: [] })
+    } finally {
+      setLoading(false)
+    }
+  }
   
   // Get user's trips
-  const userCreatedTrips = sampleTrips.filter(trip => trip.organizerId === user.id)
-  const userJoinedTrips = sampleTrips.filter(trip => 
-    trip.participants.includes(user.id) && trip.organizerId !== user.id
-  )
+  const userCreatedTrips = userTrips.organized || []
+  const userJoinedTrips = userTrips.joined || []
 
   const handleUpgrade = async (newTier) => {
     setIsProcessing(true)
@@ -267,7 +292,7 @@ const UserProfile = ({ user, setUser }) => {
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-900">My Trips</h3>
                 <Link 
-                  to="/create-trip"
+                  to="/trips/create"
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                 >
                   ➕ Create Trip
@@ -342,7 +367,7 @@ const UserProfile = ({ user, setUser }) => {
                     </p>
                     <div className="space-y-3">
                       <Link 
-                        to="/create-trip"
+                        to="/trips/create"
                         className="block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
                       >
                         Create Your First Trip
